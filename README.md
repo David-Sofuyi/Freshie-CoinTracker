@@ -1,4 +1,4 @@
-# Crypto Tracker (Django + FastAPI)
+# Freshie CoinTracker (Django + FastAPI)
 
 Live crypto prices from the CoinGecko API, with:
 
