@@ -21,17 +21,13 @@ class LoginIn(BaseModel):
 
 class TokenOut(BaseModel):
     token: str
+    username: Optional[str] = None
 
 
-class RegisterOut(BaseModel):
-    token: str
-    recovery_phrase: str
-
-
-class RecoverPasswordIn(BaseModel):
-    username: str = Field(min_length=3, max_length=150)
-    recovery_phrase: str = Field(min_length=20, max_length=256)
-    new_password: str = Field(min_length=8, max_length=128)
+class UserOut(BaseModel):
+    id: int
+    username: str
+    email: Optional[str] = None
 
 
 class WatchlistIn(BaseModel):
@@ -51,6 +47,7 @@ class AlertIn(BaseModel):
 
 class AlertOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     id: int
     coin_id: str
     vs_currency: str
@@ -62,6 +59,7 @@ class AlertOut(BaseModel):
 
 class SnapshotOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     price: Decimal
     change_24h: Optional[Decimal] = None
     captured_at: datetime
@@ -81,6 +79,7 @@ class HoldingIn(BaseModel):
 
 class HoldingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     coin_id: str
     amount: Decimal
     avg_buy_price: Decimal

@@ -5,9 +5,6 @@ from contextlib import asynccontextmanager
 from asgiref.sync import sync_to_async
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth.hashers import make_password, check_password
-from mnemonic import Mnemonic
-from market.models import AccountRecovery
 from django.core.exceptions import ValidationError
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 
@@ -91,7 +88,7 @@ async def ws_prices(ws: WebSocket):
 
 
 # ---------- Auth ----------
-@router.post("/auth/register", response_model=schemas.RegisterOut, status_code=201, tags=["auth"])
+@router.post("/auth/register", response_model=schemas.TokenOut, status_code=201, tags=["auth"])
 async def register(body: schemas.RegisterIn):
     User = get_user_model()
     if await User.objects.filter(username__iexact=body.username).aexists():
@@ -108,35 +105,8 @@ async def register(body: schemas.RegisterIn):
         user = await sync_to_async(_create)()
     except ValidationError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, list(exc.messages))
-    # BIP-39 128-bit entropy produces a cryptographically random 12-word phrase.
-    recovery_phrase = Mnemonic("english").generate(strength=128)
-    await AccountRecovery.objects.acreate(user=user, phrase_hash=make_password(recovery_phrase))
-    token = await ApiToken.objects.acreate(user=user)
-    return {"token": token.key, "recovery_phrase": recovery_phrase}
-
-
-@router.post("/auth/recover", status_code=200, tags=["auth"])
-async def recover_password(body: schemas.RecoverPasswordIn):
-    User = get_user_model()
-    try:
-        user = await User.objects.aget(username__iexact=body.username)
-        recovery = await AccountRecovery.objects.aget(user=user)
-    except (User.DoesNotExist, AccountRecovery.DoesNotExist):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid username or recovery phrase")
-    valid = await sync_to_async(check_password)(body.recovery_phrase.strip().lower(), recovery.phrase_hash)
-    if not valid:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid username or recovery phrase")
-
-    def _reset():
-        validate_password(body.new_password, user)
-        user.set_password(body.new_password)
-        user.save(update_fields=["password"])
-    try:
-        await sync_to_async(_reset)()
-    except ValidationError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, list(exc.messages))
-    await ApiToken.objects.filter(user=user).adelete()
-    return {"message": "Password reset successful. Please register/sign in again."}
+    token, _ = await ApiToken.objects.aget_or_create(user=user)
+    return {"token": token.key, "username": user.username}
 
 
 @router.post("/auth/token", response_model=schemas.TokenOut, tags=["auth"])
@@ -145,7 +115,12 @@ async def login(body: schemas.LoginIn):
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     token, _ = await ApiToken.objects.aget_or_create(user=user)
-    return {"token": token.key}
+    return {"token": token.key, "username": user.username}
+
+
+@router.get("/auth/me", response_model=schemas.UserOut, tags=["auth"])
+async def me(user=Depends(current_user)):
+    return {"id": user.id, "username": user.username, "email": user.email}
 
 
 # ---------- Watchlist ----------

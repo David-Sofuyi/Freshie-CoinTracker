@@ -102,3 +102,35 @@ class PriceClientTests(SimpleTestCase):
         with patch("api.price_client.httpx.AsyncClient", FakeAsyncClient):
             data = await PriceClient().get_prices(["notacoin"], "usd")
         self.assertEqual(data, {})
+
+
+class AuthApiTests(TestCase):
+    def setUp(self):
+        from fastapi.testclient import TestClient
+        from config.asgi import application
+        self.client = TestClient(application)
+
+    def test_register_and_get_me(self):
+        res = self.client.post("/api/auth/register", json={
+            "username": "charlie",
+            "password": "StrongPassword789!",
+            "email": "charlie@example.com"
+        })
+        self.assertEqual(res.status_code, 201)
+        data = res.json()
+        self.assertIn("token", data)
+        self.assertEqual(data["username"], "charlie")
+        token = data["token"]
+
+        # Test auth/me
+        res_me = self.client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(res_me.status_code, 200)
+        self.assertEqual(res_me.json()["username"], "charlie")
+
+        # Test login
+        res_login = self.client.post("/api/auth/token", json={
+            "username": "charlie",
+            "password": "StrongPassword789!"
+        })
+        self.assertEqual(res_login.status_code, 200)
+        self.assertEqual(res_login.json()["token"], token)

@@ -1,4 +1,4 @@
-# Freshie CoinTracker (Django + FastAPI)
+# Crypto Tracker (Django + FastAPI)
 
 Live crypto prices from the CoinGecko API, with:
 
@@ -36,8 +36,9 @@ Open:
 | GET | `/api/prices/{coin_id}` | no | One coin |
 | GET | `/api/prices/{coin_id}/history?limit=100` | no | Stored snapshots |
 | WS | `/api/ws/prices` | no | Pushed price + alert updates |
-| POST | `/api/auth/register` | no | Creates a user, returns `{token, recovery_phrase}` (12-word phrase shown once) |\n| POST | `/api/auth/recover` | no | `{username, recovery_phrase, new_password}` resets a password |\n| GET | `/api/coins?page=1&per_page=100` | no | Paginated live prices for the CoinGecko catalogue; add `q=` to search |
-| POST | `/api/auth/token` | no | `{username, password}` returns `{token}` |
+| POST | `/api/auth/register` | no | `{username, password, email?}` creates a user, returns `{token, username}` |
+| POST | `/api/auth/token` | no | `{username, password}` returns `{token, username}` |
+| GET | `/api/auth/me` | Bearer | Current user profile `{id, username, email}` |
 | GET/POST | `/api/watchlist` | Bearer | List / add `{coin_id}` |
 | DELETE | `/api/watchlist/{coin_id}` | Bearer | Remove |
 | GET/POST | `/api/alerts` | Bearer | List / create `{coin_id, direction: above\|below, target_price}` |

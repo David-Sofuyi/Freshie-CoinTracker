@@ -1,18 +1,17 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
-import dj_database_url
 
-# 1. Define base directory and load .env FIRST
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-# 2. Safely read environment variables
-NEON_AUTH_BASE_URL = os.getenv("NEON_AUTH_BASE_URL", "")
-
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-key-change-me")
 DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+if DEBUG:
+    ALLOWED_HOSTS = ["*"]
+else:
+    ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -54,26 +53,34 @@ TEMPLATES = [
 
 ASGI_APPLICATION = "config.asgi.application"
 
+# Database configuration: DATABASE_URL (e.g. Neon PostgreSQL), DB_NAME, or local SQLite
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
+}
 
-# 3. Database configuration: Neon PostgreSQL or local SQLite
-DATABASE_URL = os.getenv("DATABASE_URL", "")
-
-if DATABASE_URL.startswith(("postgres://", "postgresql://")):
-    DATABASES = {
-        "default": dj_database_url.config(
-            default=DATABASE_URL,
+database_url = os.getenv("DATABASE_URL", "")
+if database_url.startswith(("postgres://", "postgresql://")):
+    try:
+        import dj_database_url
+        DATABASES["default"] = dj_database_url.config(
+            default=database_url,
             conn_max_age=600,
             ssl_require=True,
         )
+    except ImportError:
+        pass
+elif os.getenv("DB_NAME"):
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("DB_NAME"),
+        "USER": os.getenv("DB_USER", "postgres"),
+        "PASSWORD": os.getenv("DB_PASSWORD", ""),
+        "HOST": os.getenv("DB_HOST", "localhost"),
+        "PORT": os.getenv("DB_PORT", "5432"),
     }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
-
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
