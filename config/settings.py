@@ -1,10 +1,14 @@
 import os
 from pathlib import Path
-
 from dotenv import load_dotenv
+import dj_database_url
 
+# 1. Define base directory and load .env FIRST
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
+
+# 2. Safely read environment variables
+NEON_AUTH_BASE_URL = os.getenv("NEON_AUTH_BASE_URL", "")
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-key-change-me")
 DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
@@ -50,23 +54,26 @@ TEMPLATES = [
 
 ASGI_APPLICATION = "config.asgi.application"
 
-# SQLite for development. Switch to PostgreSQL for production (see README).
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
 
-if os.getenv("DB_NAME"):  # set DB_* in .env to use PostgreSQL (pip install "psycopg[binary]")
-    DATABASES["default"] = {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DB_NAME"),
-        "USER": os.getenv("DB_USER", "postgres"),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
-        "HOST": os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "5432"),
+# 3. Database configuration: Neon PostgreSQL or local SQLite
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+if DATABASE_URL.startswith(("postgres://", "postgresql://")):
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=True,
+        )
     }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
