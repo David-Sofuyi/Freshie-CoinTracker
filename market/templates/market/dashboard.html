@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Freshie CoinTracker · Live Markets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ── */
+  :root {
+    --black:      #0a0a0a;
+    --black-2:    #111111;
+    --black-3:    #1a1a1a;
+    --black-4:    #222222;
+    --black-5:    #2e2e2e;
+    --yellow:     #f5c518;
+    --yellow-dim: #c9a014;
+    --yellow-glow:rgba(245,197,24,.18);
+    --yellow-soft:rgba(245,197,24,.08);
+    --text:       #f0f0f0;
+    --text-muted: #888;
+    --text-dim:   #555;
+    --up:         #22c55e;
+    --up-glow:    rgba(34,197,94,.15);
+    --down:       #ef4444;
+    --down-glow:  rgba(239,68,68,.15);
+    --border:     rgba(255,255,255,.07);
+    --border-y:   rgba(245,197,24,.35);
+    --radius:     14px;
+    --radius-sm:  8px;
+    --shadow:     0 4px 24px rgba(0,0,0,.55);
+    --shadow-y:   0 0 32px rgba(245,197,24,.12);
+  }
+
+  /* ── Reset & base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--black);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Grid background ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(245,197,24,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245,197,24,.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Layout ── */
+  .page { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 20px 48px; }
+
+  /* ── Top bar ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 20px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-icon {
+    width: 42px; height: 42px;
+    background: var(--yellow);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 20px rgba(245,197,24,.4);
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .brand-name {
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: #fff;
+  }
+  .brand-name span { color: var(--yellow); }
+  .brand-tag { font-size: .72rem; color: var(--text-muted); letter-spacing: .08em; text-transform: uppercase; }
+
+  /* ── Status pill ── */
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--black-3);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 7px 16px;
+    font-size: .82rem;
+    color: var(--text-muted);
+    transition: border-color .3s;
+  }
+  .status-pill.live { border-color: var(--up); color: var(--up); }
+  .pulse {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--down);
+    flex-shrink: 0;
+    transition: background .3s;
+  }
+  .status-pill.live .pulse {
+    background: var(--up);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,.5); }
+    50%      { box-shadow: 0 0 0 5px rgba(34,197,94,0); }
+  }
+
+  .topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .nav-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--black-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 7px 14px;
+    font-size: .82rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: border-color .2s, color .2s;
+  }
+  .nav-link:hover { border-color: var(--border-y); color: var(--yellow); }
+
+  /* ── Stat cards row ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--black-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    transition: border-color .25s, box-shadow .25s;
+  }
+  .stat-card:hover { border-color: var(--border-y); box-shadow: var(--shadow-y); }
+  .stat-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 6px; }
+  .stat-value { font-size: 1.35rem; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+  .stat-sub { font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
+
+  /* ── Section header ── */
+  .section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .section-title {
+    font-size: .78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--yellow);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::before {
+    content: '';
+    display: inline-block;
+    width: 3px; height: 14px;
+    background: var(--yellow);
+    border-radius: 2px;
+  }
+  .section-hint { font-size: .78rem; color: var(--text-dim); }
+
+  /* ── Main table card ── */
+  .table-card {
+    background: var(--black-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 520px; }
+
+  thead tr { background: var(--black-3); border-bottom: 1px solid var(--border-y); }
+  th {
+    padding: 13px 20px;
+    text-align: right;
+    font-size: .7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--yellow-dim);
+  }
+  th:first-child { text-align: left; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .15s;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--yellow-soft); }
+
+  td {
+    padding: 15px 20px;
+    text-align: right;
+    font-size: .9rem;
+    color: var(--text);
+  }
+  td:first-child { text-align: left; }
+
+  /* coin cell */
+  .coin-cell { display: flex; align-items: center; gap: 12px; }
+  .coin-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--black-4);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: .75rem;
+    font-weight: 700;
+    color: var(--yellow);
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .coin-name { font-weight: 600; text-transform: capitalize; color: #fff; }
+  .coin-tag  { font-size: .72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+
+  /* price cell */
+  .price-val { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+
+  /* change badge */
+  .badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: .78rem;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .badge.up   { background: var(--up-glow);   color: var(--up); }
+  .badge.down { background: var(--down-glow); color: var(--down); }
+
+  /* market cap */
+  .mcap { font-family: 'JetBrains Mono', monospace; color: var(--text-muted); font-size: .85rem; }
+
+  /* flash animations */
+  .flash-up   { animation: fu .9s ease-out; }
+  .flash-down { animation: fd .9s ease-out; }
+  @keyframes fu { from { background: rgba(34,197,94,.18); } to { background: transparent; } }
+  @keyframes fd { from { background: rgba(239,68,68,.18); } to { background: transparent; } }
+
+  /* skeleton loader rows */
+  .skeleton td { color: transparent !important; }
+  .skeleton td::after {
+    content: '████████';
+    color: var(--black-5);
+    border-radius: 4px;
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer {
+    0%,100% { opacity: .5; }
+    50%      { opacity: 1; }
+  }
+
+  /* ── Chart card ── */
+  .chart-card {
+    background: var(--black-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    margin-top: 20px;
+    box-shadow: var(--shadow);
+    display: none;
+  }
+  .chart-card.visible { display: block; }
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .chart-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+  }
+  .chart-title span { color: var(--yellow); }
+  .chart-meta {
+    font-size: .78rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .chart-close {
+    background: var(--black-4);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: .78rem;
+    cursor: pointer;
+    transition: border-color .2s, color .2s;
+  }
+  .chart-close:hover { border-color: var(--down); color: var(--down); }
+  .chart-wrap { position: relative; }
+  svg#chart {
+    width: 100%;
+    height: 200px;
+    display: block;
+    border-radius: var(--radius-sm);
+    overflow: visible;
+  }
+  .chart-gradient { opacity: .15; }
+
+  /* ── Alert toasts ── */
+  #alerts { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+  .toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: var(--black-2);
+    border: 1px solid var(--border-y);
+    border-left: 3px solid var(--yellow);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    font-size: .88rem;
+    animation: slideIn .35s ease-out;
+    box-shadow: var(--shadow-y);
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .toast-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+  .toast-body { flex: 1; }
+  .toast-title { font-weight: 600; color: var(--yellow); margin-bottom: 2px; }
+  .toast-desc  { color: var(--text-muted); font-size: .82rem; }
+  .toast-time  { font-size: .72rem; color: var(--text-dim); margin-top: 4px; }
+
+  /* ── Footer ── */
+  footer {
+    margin-top: 44px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: .78rem;
+    color: var(--text-dim);
+  }
+  footer a { color: var(--yellow-dim); text-decoration: none; }
+  footer a:hover { color: var(--yellow); }
+  .footer-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-muted); }
+
+  /* ── Ticker strip ── */
+  .ticker-wrap {
+    overflow: hidden;
+    background: var(--black-3);
+    border-top: 1px solid var(--border-y);
+    border-bottom: 1px solid var(--border-y);
+    padding: 10px 0;
+    margin-bottom: 28px;
+    white-space: nowrap;
+  }
+  .ticker-track {
+    display: inline-flex;
+    gap: 36px;
+    animation: ticker 30s linear infinite;
+  }
+  @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .ticker-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .8rem;
+  }
+  .ticker-name { font-weight: 600; color: var(--text-muted); text-transform: capitalize; }
+  .ticker-price { font-family: 'JetBrains Mono', monospace; color: #fff; }
+  .ticker-chg.up   { color: var(--up); }
+  .ticker-chg.down { color: var(--down); }
+
+  input { background:var(--black-3);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font:inherit; }
+  input:focus { outline:none;border-color:var(--yellow); }
+  button.nav-link { cursor:pointer; }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .topbar { padding: 16px 0 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Top bar ── -->
+  <nav class="topbar">
+    <div class="brand">
+      <div class="brand-icon">₿</div>
+      <div>
+        <div class="brand-name">Freshie <span>CoinTracker</span></div>
+        <div class="brand-tag">Live Market Dashboard</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="status-pill" id="statusPill">
+        <span class="pulse" id="dot"></span>
+        <span id="statusText">Connecting…</span>
+      </div>
+      <button class="nav-link" onclick="showAuth('register')">Create Account</button>
+      <button class="nav-link" onclick="showAuth('login')">Sign In</button>
+      <a class="nav-link" href="/api/docs">⚡ API Docs</a>
+      <a class="nav-link" href="/admin/">⚙ Admin</a>
+    </div>
+  </nav>
+
+  <!-- ── Live ticker strip ── -->
+  <div class="ticker-wrap">
+    <div class="ticker-track" id="tickerTrack">
+      {% for c in coins %}<span class="ticker-item"><span class="ticker-name">{{ c }}</span> <span class="ticker-price" id="tick-{{ c }}">…</span> <span class="ticker-chg" id="tickch-{{ c }}">—</span></span>{% endfor %}
+      <!-- duplicated for seamless loop -->
+      {% for c in coins %}<span class="ticker-item"><span class="ticker-name">{{ c }}</span> <span class="ticker-price" id="tick2-{{ c }}">…</span> <span class="ticker-chg" id="tickch2-{{ c }}">—</span></span>{% endfor %}
+    </div>
+  </div>
+
+  <!-- ── Stat cards ── -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">🟡 Coins Tracked</div>
+      <div class="stat-value" id="statCoins">{{ coins|length }}</div>
+      <div class="stat-sub">Live via CoinGecko</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">📈 Top Gainer (24h)</div>
+      <div class="stat-value" id="statGainer" style="color:var(--up)">—</div>
+      <div class="stat-sub" id="statGainerSub">Waiting for data…</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">📉 Top Loser (24h)</div>
+      <div class="stat-value" id="statLoser" style="color:var(--down)">—</div>
+      <div class="stat-sub" id="statLoserSub">Waiting for data…</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">🕐 Last Updated</div>
+      <div class="stat-value" id="statTime" style="font-size:1rem">—</div>
+      <div class="stat-sub">Auto-refresh every 60s</div>
+    </div>
+  </div>
+
+  <!-- ── Main table ── -->
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin:18px 0">
+    <input id="coinSearch" placeholder="Search any CoinGecko cryptocurrency..." onkeydown="if(event.key==='Enter') searchCoins()" style="flex:1;min-width:220px">
+    <button class="nav-link" onclick="searchCoins()">Search</button>
+    <button class="nav-link" onclick="loadCoinPage(1)">All coins</button>
+  </div>
+  <div class="section-head">
+    <div class="section-title">Live Prices</div>
+    <div class="section-hint">Click any row to view price chart</div>
+  </div>
+
+  <div class="table-card">
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>#&nbsp;&nbsp;Coin</th>
+            <th>Price ({{ vs|upper }})</th>
+            <th>24h Change</th>
+            <th>Market Cap</th>
+            <th>Last Update</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          {% for c in coins %}
+          <tr id="row-{{ c }}" class="skeleton">
+            <td><div class="coin-cell"><div class="coin-avatar">{{ c|slice:":2" }}</div><div><div class="coin-name">{{ c }}</div><div class="coin-tag">{{ c|slice:":4"|upper }}</div></div></div></td>
+            <td><span class="price-val">…</span></td>
+            <td>…</td>
+            <td class="mcap">…</td>
+            <td style="color:var(--text-dim);font-size:.78rem">…</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:center;align-items:center;gap:14px;margin-top:14px">
+    <button class="nav-link" id="prevCoins" onclick="changeCoinPage(-1)">← Previous</button>
+    <span id="coinPageLabel" style="color:var(--text-muted)">Page 1</span>
+    <button class="nav-link" id="nextCoins" onclick="changeCoinPage(1)">Next →</button>
+  </div>
+
+  <!-- ── Chart card ── -->
+  <div class="chart-card" id="chartCard">
+    <div class="chart-header">
+      <div class="chart-title">Price History — <span id="chartTitle"></span></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="chart-meta" id="chartRange"></div>
+        <button class="chart-close" onclick="closeChart()">✕ Close</button>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <svg id="chart" viewBox="0 0 800 200" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="gradUp" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#22c55e" stop-opacity=".3"/>
+            <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="gradDown" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ef4444" stop-opacity=".3"/>
+            <stop offset="100%" stop-color="#ef4444" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ── Alerts ── -->
+  <div id="alerts"></div>
+
+  <!-- ── Footer ── -->
+  <footer>
+    <div class="footer-brand">
+      <span style="color:var(--yellow)">₿</span> Freshie CoinTracker
+    </div>
+    <div>Live data · <a href="https://www.coingecko.com" target="_blank" rel="noopener">CoinGecko</a></div>
+    <div>
+      <a href="/api/docs">API Docs</a>
+      &nbsp;·&nbsp;
+      <a href="/admin/">Admin Panel</a>
+    </div>
+  </footer>
+
+</div><!-- /page -->
+
+<script>
+/* ── Helpers ── */
+const VS  = "{{ vs }}";
+const fmt = (n, d=2) => n == null ? "—"
+  : Number(n).toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : d });
+const compact = n => n == null ? "—"
+  : Intl.NumberFormat(undefined, { notation:"compact", maximumFractionDigits: 2 }).format(n);
+const pct = ch => ch == null ? "—"
+  : (ch >= 0 ? "▲ +" : "▼ ") + Math.abs(ch).toFixed(2) + "%";
+const timeStr = ts => ts
+  ? new Date(ts * 1000).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" })
+  : "—";
+
+const last   = {};
+let   rowIdx = {};  // coin_id -> rank index
+
+/* ── Render table rows ── */
+function render(list, allowAppend=true) {
+  const tbody = document.getElementById("rows");
+
+  // Sort by market cap desc for ranking
+  const sorted = [...list].sort((a,b) => (b.market_cap||0)-(a.market_cap||0));
+  sorted.forEach((p,i) => { rowIdx[p.coin_id] = i+1; });
+
+  list.forEach(p => {
+    let tr = document.getElementById("row-" + p.coin_id);
+    if (!tr && !allowAppend) return;
+    if (!tr) {
+      tr = document.createElement("tr");
+      tr.id = "row-" + p.coin_id;
+      tbody.appendChild(tr);
+    }
+    tr.classList.remove("skeleton");
+    const ch  = p.change_24h;
+    const dir = ch == null ? "" : ch >= 0 ? "up" : "down";
+    const rank = rowIdx[p.coin_id] || "—";
+    const abbr = (p.symbol || p.coin_id.slice(0,4)).toUpperCase();
+    const displayName = p.name || p.coin_id;
+
+    tr.innerHTML = `
+      <td>
+        <div class="coin-cell">
+          <div class="coin-avatar">${p.coin_id.slice(0,2).toUpperCase()}</div>
+          <div>
+            <div class="coin-name">${displayName}</div>
+            <div class="coin-tag">${abbr} · #${rank}</div>
+          </div>
+        </div>
+      </td>
+      <td><span class="price-val">${fmt(p.price)}</span></td>
+      <td><span class="badge ${dir}">${pct(ch)}</span></td>
+      <td class="mcap">${compact(p.market_cap)}</td>
+      <td style="color:var(--text-dim);font-size:.78rem">${timeStr(p.last_updated_at)}</td>`;
+
+    if (last[p.coin_id] != null && last[p.coin_id] !== p.price) {
+      tr.classList.remove("flash-up", "flash-down");
+      void tr.offsetWidth;
+      tr.classList.add(p.price > last[p.coin_id] ? "flash-up" : "flash-down");
+    }
+    last[p.coin_id] = p.price;
+
+    // Update ticker
+    for (const sfx of ["", "2"]) {
+      const tp = document.getElementById(`tick${sfx}-${p.coin_id}`);
+      const tc = document.getElementById(`tickch${sfx}-${p.coin_id}`);
+      if (tp) tp.textContent = fmt(p.price);
+      if (tc) {
+        tc.textContent = ch == null ? "—" : (ch >= 0 ? "▲" : "▼") + Math.abs(ch).toFixed(2) + "%";
+        tc.className = "ticker-chg " + dir;
+      }
+    }
+  });
+
+  updateStats(list);
+  document.getElementById("statTime").textContent = new Date().toLocaleTimeString();
+}
+
+/* ── Stat cards ── */
+function updateStats(list) {
+  const withChange = list.filter(p => p.change_24h != null);
+  if (!withChange.length) return;
+  const gainer = withChange.reduce((a,b) => a.change_24h > b.change_24h ? a : b);
+  const loser  = withChange.reduce((a,b) => a.change_24h < b.change_24h ? a : b);
+  document.getElementById("statGainer").textContent    = gainer.coin_id.charAt(0).toUpperCase() + gainer.coin_id.slice(1);
+  document.getElementById("statGainerSub").textContent = "▲ +" + gainer.change_24h.toFixed(2) + "%";
+  document.getElementById("statLoser").textContent     = loser.coin_id.charAt(0).toUpperCase() + loser.coin_id.slice(1);
+  document.getElementById("statLoserSub").textContent  = "▼ " + Math.abs(loser.change_24h).toFixed(2) + "%";
+}
+
+/* ── Status pill ── */
+function setStatus(live, text) {
+  const pill = document.getElementById("statusPill");
+  document.getElementById("dot").style.background = live ? "var(--up)" : "var(--down)";
+  document.getElementById("statusText").textContent = text;
+  pill.classList.toggle("live", live);
+}
+
+/* ── WebSocket ── */
+function connect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(`${proto}://${location.host}/api/ws/prices`);
+  ws.onopen    = () => setStatus(true, "Live");
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === "prices") render(msg.data, false);
+    if (msg.type === "alert")  showAlert(msg);
+  };
+  ws.onclose = () => { setStatus(false, "Reconnecting…"); setTimeout(connect, 3000); };
+}
+
+/* ── Alert toasts ── */
+function showAlert(msg) {
+  const wrap = document.getElementById("alerts");
+  const now  = new Date().toLocaleTimeString();
+  const d    = document.createElement("div");
+  d.className = "toast";
+  const isAbove = msg.direction === "above";
+  d.innerHTML = `
+    <div class="toast-icon">${isAbove ? "🚀" : "⚠️"}</div>
+    <div class="toast-body">
+      <div class="toast-title">Price Alert Triggered</div>
+      <div class="toast-desc">
+        <strong>${msg.coin_id}</strong> went <strong>${msg.direction}</strong>
+        your target of <strong>${msg.target_price}</strong> ${VS.toUpperCase()}
+        — now at <strong>${msg.price}</strong>
+      </div>
+      <div class="toast-time">🕐 ${now}</div>
+    </div>`;
+  wrap.prepend(d);
+  setTimeout(() => d.style.opacity = "0.4", 8000);
+}
+
+/* ── Chart ── */
+let activeChart = null;
+
+async function showChart(coin) {
+  activeChart = coin;
+  const r = await fetch(`/api/prices/${coin}/history?limit=300`);
+  if (!r.ok) return;
+  const pts = (await r.json())
+    .reverse()
+    .map(x => ({ t: new Date(x.captured_at), p: Number(x.price) }));
+
+  const card  = document.getElementById("chartCard");
+  const title = document.getElementById("chartTitle");
+  title.textContent = coin.charAt(0).toUpperCase() + coin.slice(1);
+  card.classList.add("visible");
+
+  const svg = document.getElementById("chart");
+  if (pts.length < 2) {
+    svg.innerHTML = `<text x="400" y="100" text-anchor="middle" fill="#555" font-family="Inter,sans-serif" font-size="14">Collecting data… check back in a minute</text>`;
+    document.getElementById("chartRange").textContent = "";
+    return;
+  }
+
+  const W = 800, H = 190, PAD = 10;
+  const prices = pts.map(x => x.p);
+  const min = Math.min(...prices), max = Math.max(...prices), span = max - min || 1;
+  const up  = prices[prices.length - 1] >= prices[0];
+  const color  = up ? "#22c55e" : "#ef4444";
+  const gradId = up ? "gradUp"  : "gradDown";
+
+  const toX = i  => (i / (pts.length - 1)) * W;
+  const toY = p  => H - PAD - ((p - min) / span) * (H - PAD * 2);
+
+  const linePoints = pts.map((x, i) => `${toX(i)},${toY(x.p)}`).join(" ");
+  const areaPoints = `0,${H} ` + linePoints + ` ${W},${H}`;
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="gradUp" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#22c55e" stop-opacity=".28"/>
+        <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="gradDown" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#ef4444" stop-opacity=".28"/>
+        <stop offset="100%" stop-color="#ef4444" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <polygon points="${areaPoints}" fill="url(#${gradId})"/>
+    <polyline fill="none" stroke="${color}" stroke-width="2.5"
+      vector-effect="non-scaling-stroke"
+      stroke-linecap="round" stroke-linejoin="round"
+      points="${linePoints}"/>
+    <circle cx="${toX(pts.length-1)}" cy="${toY(prices[prices.length-1])}"
+      r="4" fill="${color}" vector-effect="non-scaling-stroke"/>`;
+
+  const lo = fmt(min), hi = fmt(max);
+  document.getElementById("chartRange").innerHTML =
+    `<span style="color:var(--down)">Low ${lo}</span>
+     &nbsp;·&nbsp;
+     <span style="color:var(--up)">High ${hi}</span>
+     &nbsp;·&nbsp;
+     <span>${pts.length} pts</span>`;
+}
+
+function closeChart() {
+  document.getElementById("chartCard").classList.remove("visible");
+  activeChart = null;
+}
+
+/* ── Row click -> chart ── */
+document.getElementById("rows").addEventListener("click", e => {
+  const tr = e.target.closest("tr");
+  if (tr) showChart(tr.id.replace("row-", ""));
+});
+
+/* ── CoinGecko full catalogue ── */
+let coinPage = 1;
+let searchMode = false;
+async function loadCoinPage(page=1) {
+  searchMode = false;
+  coinPage = page;
+  const response = await fetch(`/api/coins?page=${page}&per_page=100`);
+  if (!response.ok) { setStatus(false, "Price feed unavailable"); return; }
+  const data = await response.json();
+  document.getElementById("rows").innerHTML = "";
+  render(data);
+  document.getElementById("statCoins").textContent = "100/page";
+  document.getElementById("coinPageLabel").textContent = `Page ${page}`;
+  document.getElementById("prevCoins").disabled = page <= 1;
+  document.getElementById("nextCoins").disabled = data.length < 100;
+}
+async function searchCoins() {
+  const q = document.getElementById("coinSearch").value.trim();
+  if (!q) return loadCoinPage(1);
+  searchMode = true;
+  const response = await fetch(`/api/coins?q=${encodeURIComponent(q)}`);
+  const data = response.ok ? await response.json() : [];
+  document.getElementById("rows").innerHTML = "";
+  render(data);
+  document.getElementById("coinPageLabel").textContent = `${data.length} search results`;
+  document.getElementById("prevCoins").disabled = true;
+  document.getElementById("nextCoins").disabled = true;
+}
+function changeCoinPage(delta) { if (!searchMode) loadCoinPage(Math.max(1, coinPage + delta)); }
+
+/* ── Account registration, login and recovery ── */
+let authMode = "register";
+function showAuth(mode) {
+  authMode = mode;
+  const panel = document.getElementById("authPanel");
+  panel.style.display = "block";
+  document.getElementById("authTitle").textContent =
+    mode === "register" ? "Create Freshie account" : mode === "recover" ? "Recover your password" : "Sign in";
+  document.getElementById("authEmail").style.display = mode === "register" ? "block" : "none";
+  document.getElementById("authPassword").placeholder = mode === "recover" ? "New password" : "Password";
+  document.getElementById("authPhrase").style.display = mode === "recover" ? "block" : "none";
+  document.getElementById("authSubmit").textContent = mode === "register" ? "Create account" : mode === "recover" ? "Reset password" : "Sign in";
+  document.getElementById("authMessage").textContent = "";
+  panel.scrollIntoView({behavior:"smooth"});
+}
+async function submitAuth() {
+  const username = document.getElementById("authUsername").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const message = document.getElementById("authMessage");
+  const payload = {username, password};
+  let endpoint = "/api/auth/register";
+  if (authMode === "register") payload.email = document.getElementById("authEmail").value.trim();
+  if (authMode === "login") endpoint = "/api/auth/token";
+  if (authMode === "recover") {
+    endpoint = "/api/auth/recover";
+    payload.new_password = password;
+    payload.recovery_phrase = document.getElementById("authPhrase").value.trim();
+    delete payload.password;
+  }
+  const response = await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+  const data = await response.json();
+  if (!response.ok) { message.textContent = Array.isArray(data.detail) ? data.detail.join("\\n") : (data.detail || "Request failed"); return; }
+  if (authMode === "register") {
+    message.textContent = "ACCOUNT CREATED. SAVE THIS 12-WORD RECOVERY PHRASE NOW. It is shown only once:\\n\\n" + data.recovery_phrase + "\\n\\nKeep it private and offline. It cannot be retrieved later.";
+    message.style.color = "var(--yellow)";
+  } else if (authMode === "recover") {
+    message.textContent = data.message;
+  } else {
+    message.textContent = "Signed in successfully.";
+    localStorage.setItem("freshie_api_token", data.token);
+  }
+}
+
+/* ── Boot ── */
+loadCoinPage(1).catch(() => {});
+connect();
+setInterval(() => {
+  if (searchMode) searchCoins();
+  else loadCoinPage(coinPage);
+}, 60000);
+</script>
+</body>
+</html>
