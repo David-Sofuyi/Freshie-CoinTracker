@@ -152,3 +152,7 @@ Paystack Dedicated Virtual Accounts are available only to registered businesses 
 Luno's business-account guidance says that businesses buying, selling or storing third-party customer funds must demonstrate the relevant licences and provide AML/ATF/KYC policies. A business application has not yet been made, so no Luno orders are submitted.
 
 Never set the approval flags to `1` merely to bypass these requirements. API keys must be stored only in server environment variables or a secrets manager.
+
+## User profile
+
+Signed-in users can open `/profile/` from the dashboard to save their first name, surname, phone number and gender. The profile API (`GET /api/profile`, `PUT /api/profile`) is authenticated with the existing CryptoTracker bearer token. Names are stored on the Django user record; phone number and gender are stored in the one-to-one `UserProfile` model. Apply the new migration with `python manage.py migrate`.

@@ -180,3 +180,15 @@ class PaystackDedicatedAccount(models.Model):
 
     def __str__(self):
         return f"{self.user_id}: {self.bank_name} {self.account_number}"
+
+
+class UserProfile(models.Model):
+    """Additional personal details belonging to one CryptoTracker account."""
+    GENDER_CHOICES = [("male", "Male"), ("female", "Female"), ("other", "Other"), ("prefer_not_to_say", "Prefer not to say")]
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile")
+    phone_number = models.CharField(max_length=30, blank=True)
+    gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Profile for {self.user.username}"

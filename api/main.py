@@ -17,7 +17,7 @@ import secrets
 from django.core.exceptions import ValidationError
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
 
-from market.models import ApiToken, Holding, PriceAlert, PriceSnapshot, WatchlistItem, PasswordResetCode, WalletAccount, WalletTransaction, PaystackDedicatedAccount
+from market.models import ApiToken, Holding, PriceAlert, PriceSnapshot, WatchlistItem, PasswordResetCode, WalletAccount, WalletTransaction, PaystackDedicatedAccount, UserProfile
 from django.conf import settings
 
 from . import schemas
@@ -281,6 +281,46 @@ async def delete_holding(coin_id: str, user=Depends(current_user)):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Holding not found")
 
 
+
+
+# ---------- User profile ----------
+@router.get("/profile", tags=["profile"])
+async def get_profile(user=Depends(current_user)):
+    profile, _ = await UserProfile.objects.aget_or_create(user=user)
+    return {"username": user.username, "email": user.email, "first_name": user.first_name,
+            "surname": user.last_name, "phone_number": profile.phone_number, "gender": profile.gender}
+
+
+@router.put("/profile", tags=["profile"])
+async def update_profile(request: Request, user=Depends(current_user)):
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "A valid JSON body is required")
+    first_name = str(body.get("first_name", "")).strip()
+    surname = str(body.get("surname", "")).strip()
+    phone_number = str(body.get("phone_number", "")).strip()
+    gender = str(body.get("gender", "")).strip()
+    allowed_genders = {"", "male", "female", "other", "prefer_not_to_say"}
+    if len(first_name) > 150 or len(surname) > 150:
+        raise HTTPException(422, "Names must be 150 characters or fewer")
+    if len(phone_number) > 30:
+        raise HTTPException(422, "Phone number must be 30 characters or fewer")
+    if gender not in allowed_genders:
+        raise HTTPException(422, "Select a valid gender option")
+
+    def _save():
+        user.first_name = first_name
+        user.last_name = surname
+        user.save(update_fields=["first_name", "last_name"])
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        profile.phone_number = phone_number
+        profile.gender = gender
+        profile.save(update_fields=["phone_number", "gender", "updated_at"])
+        return profile
+    profile = await sync_to_async(_save, thread_sensitive=True)()
+    return {"message": "Profile updated successfully", "first_name": user.first_name,
+            "surname": user.last_name, "phone_number": profile.phone_number, "gender": profile.gender}
 
 # ---------- Wallets and payment rails ----------
 def _payments_enabled():
