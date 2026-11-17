@@ -707,6 +707,9 @@
     <button class="tab-btn" id="tabBtn-alerts" onclick="switchTab('alerts')">
       🔔 Price Alerts <span class="tab-count" id="alertsCountBadge">0</span>
     </button>
+    <button class="tab-btn" id="tabBtn-wallet" onclick="switchTab('wallet')">
+      💳 Wallet
+    </button>
   </div>
 
   <!-- ── Stat Cards ── -->
@@ -739,7 +742,10 @@
   <section id="view-markets">
     <div class="section-head">
       <div class="section-title">Market Overview</div>
-      <input type="text" class="search-input" id="marketSearch" placeholder="🔍 Filter coins..." oninput="filterTable()">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <input type="text" class="search-input" id="marketSearch" placeholder="🔍 Search all coins by name or symbol..." oninput="searchMarkets()">
+        <select class="form-control" id="marketCurrency" style="width:auto;min-width:100px" onchange="changeMarketCurrency()"><option value="usd">USD ($)</option><option value="ngn">NGN (₦)</option></select>
+      </div>
     </div>
 
     <div class="table-card">
@@ -749,7 +755,7 @@
             <tr>
               <th style="width:40px"></th>
               <th>Coin</th>
-              <th>Price ({{ vs|upper }})</th>
+              <th id="marketPriceHeading">Price ({{ vs|upper }})</th>
               <th>24h Change</th>
               <th>Market Cap</th>
               <th>Actions</th>
@@ -780,6 +786,11 @@
           </tbody>
         </table>
       </div>
+    </div>
+    <div style="display:flex;justify-content:center;gap:12px;margin:16px 0">
+      <button class="btn btn-outline" id="marketPrev" onclick="changeMarketPage(-1)">Previous</button>
+      <span id="marketPageLabel" style="align-self:center;color:var(--text-muted)">Page 1</span>
+      <button class="btn btn-outline" id="marketNext" onclick="changeMarketPage(1)">Next</button>
     </div>
 
     <!-- ── Interactive Chart Card ── -->
@@ -911,6 +922,29 @@
   <!-- ═══════════════════════════════════════════════
        VIEW 4: PRICE ALERTS
   ════════════════════════════════════════════════ -->
+  <section id="view-wallet" style="display:none">
+    <div class="section-heading"><div><h2>Wallet</h2><p>NGN and USD balances, deposits, transfers and withdrawals</p></div></div>
+    <div class="prompt-box" id="walletGuestPrompt" style="display:block">Sign in to access your wallet.</div>
+    <div id="walletContent" style="display:none">
+      <div class="stats-row" style="margin-bottom:20px">
+        <div class="stat-card"><div class="stat-label">NGN Wallet</div><div class="stat-value" id="walletNgn">₦0.00</div></div>
+        <div class="stat-card"><div class="stat-label">USD Wallet</div><div class="stat-value" id="walletUsd">$0.00</div></div>
+      </div>
+      <div class="panel" style="padding:20px;margin-bottom:20px">
+        <h3>Fund NGN wallet</h3><form onsubmit="walletDeposit(event)" class="modal-form"><input id="depositAmount" class="form-control" type="number" min="100" step="0.01" required placeholder="Amount in NGN"><button class="btn btn-yellow" type="submit">Continue to Paystack</button></form>
+        <p class="muted">Deposits are credited only after Paystack verifies the payment webhook. NGN deposits only.</p>
+      </div>
+      <div class="panel" style="padding:20px;margin-bottom:20px">
+        <h3>Transfer to another CryptoTracker user</h3><form onsubmit="walletTransfer(event)" class="modal-form"><input id="transferUsername" class="form-control" required placeholder="Recipient username"><select id="transferCurrency" class="form-control"><option value="NGN">NGN</option><option value="USD">USD</option></select><input id="transferAmount" class="form-control" type="number" min="0.00000001" step="0.00000001" required placeholder="Amount"><button class="btn btn-yellow" type="submit">Transfer</button></form>
+      </div>
+      <div class="panel" style="padding:20px;margin-bottom:20px">
+        <h3>Withdraw NGN to bank</h3><form onsubmit="walletWithdraw(event)" class="modal-form"><input id="withdrawAmount" class="form-control" type="number" min="100" step="0.01" required placeholder="Amount in NGN"><input id="withdrawAccount" class="form-control" inputmode="numeric" pattern="[0-9]{10}" required placeholder="10-digit account number"><input id="withdrawBankCode" class="form-control" required placeholder="Paystack bank code"><input id="withdrawAccountName" class="form-control" required placeholder="Account holder name"><button class="btn btn-yellow" type="submit">Request withdrawal</button></form>
+      </div>
+      <div class="panel" style="padding:20px"><h3>Recent wallet activity</h3><div style="overflow-x:auto"><table class="data-table"><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Status</th><th>Reference</th></tr></thead><tbody id="walletTransactions"><tr><td colspan="5">Loading wallet activity…</td></tr></tbody></table></div></div>
+      <div class="prompt-box" style="margin-top:18px">Crypto buy/sell is not enabled yet. Luno API keys control the linked Luno account; customer-specific custody and account allocation must be approved and implemented before real customer trades can be executed.</div>
+    </div>
+  </section>
+
   <section id="view-alerts" style="display:none">
     <!-- Logged out prompt -->
     <div class="prompt-box" id="alertsGuestPrompt">
@@ -994,7 +1028,7 @@
       </div>
       <div class="form-group">
         <label>Email <span style="color:var(--text-dim)">(optional)</span></label>
-        <input type="email" class="form-control" id="regEmail" placeholder="you@example.com">
+        <input type="email" class="form-control" id="regEmail" placeholder="you@example.com" required>
       </div>
       <div class="form-group">
         <label>Password</label>
@@ -1035,8 +1069,29 @@
     </form>
 
     <div class="modal-footer">
+      <a onclick="switchModal('login', 'forgot')">Forgot password?</a><br>
       Don't have an account? <a onclick="switchModal('login', 'register')">Create Account</a>
     </div>
+  </div>
+</div>
+
+<!-- Password reset modal -->
+<div class="modal-backdrop" id="forgotModal" onclick="closeModalOnBackdrop(event, 'forgot')">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('forgot')">✕</button>
+    <div class="modal-title">Reset <span>Password</span></div>
+    <div class="modal-subtitle">Request a one-time code by email, then enter it with your new password.</div>
+    <div class="modal-error" id="forgotError"></div>
+    <form class="modal-form" onsubmit="requestResetCode(event)">
+      <div class="form-group"><label>Email address</label><input type="email" class="form-control" id="resetEmail" required></div>
+      <button class="btn btn-yellow" type="submit" style="padding:12px">Send reset code</button>
+    </form>
+    <form class="modal-form" onsubmit="confirmPasswordReset(event)">
+      <div class="form-group"><label>6-digit code</label><input class="form-control" id="resetCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></div>
+      <div class="form-group"><label>New password</label><input type="password" class="form-control" id="resetNewPassword" minlength="8" required></div>
+      <button class="btn btn-yellow" type="submit" style="padding:12px">Reset password</button>
+    </form>
+    <div class="modal-footer"><a onclick="switchModal('forgot', 'login')">Back to sign in</a></div>
   </div>
 </div>
 
@@ -1074,7 +1129,7 @@
      JAVASCRIPT APP LOGIC
 ════════════════════════════════════════════════ -->
 <script>
-const VS = "{{ vs }}";
+let VS = "{{ vs }}";
 let token = localStorage.getItem("crypto_token") || null;
 let currentUser = null;
 
@@ -1109,7 +1164,7 @@ function closeModalOnBackdrop(e, id) {
 }
 window.addEventListener("keydown", e => {
   if (e.key === "Escape") {
-    ["register", "login", "holding"].forEach(closeModal);
+    ["register", "login", "holding", "forgot"].forEach(closeModal);
     closeChart();
   }
 });
@@ -1170,6 +1225,8 @@ function setLoggedInUI(user) {
 
   document.getElementById("alertsGuestPrompt").style.display = "none";
   document.getElementById("alertsContent").style.display = "block";
+  document.getElementById("walletGuestPrompt").style.display = "none";
+  document.getElementById("walletContent").style.display = "block";
 }
 
 function setLoggedOutUI() {
@@ -1187,6 +1244,8 @@ function setLoggedOutUI() {
 
   document.getElementById("alertsGuestPrompt").style.display = "block";
   document.getElementById("alertsContent").style.display = "none";
+  document.getElementById("walletGuestPrompt").style.display = "block";
+  document.getElementById("walletContent").style.display = "none";
 
   document.getElementById("watchlistCountBadge").textContent = "0";
   document.getElementById("alertsCountBadge").textContent = "0";
@@ -1231,7 +1290,7 @@ async function handleRegister(e) {
       token = data.token;
       localStorage.setItem("crypto_token", token);
       closeModal("register");
-      showToast("Account Created! 🚀", `Welcome, ${username}! Your account is ready.`);
+      showToast(data.email_notification_sent === false ? "Account Created" : "Account Created! 🚀", data.email_notification_sent === false ? "Your account is ready, but the welcome email could not be sent. Check your email settings." : `Welcome, ${username}! A confirmation email has been sent.`);
       await checkAuth();
     } else {
       let msg = "Registration failed.";
@@ -1250,6 +1309,34 @@ async function handleRegister(e) {
     btn.disabled = false;
     btn.textContent = "Create Free Account";
   }
+}
+
+/* ── Email password reset ── */
+async function requestResetCode(e) {
+  e.preventDefault();
+  const box = document.getElementById("forgotError");
+  box.style.display = "none";
+  try {
+    const res = await fetch("/api/auth/password/forgot", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({email: document.getElementById("resetEmail").value.trim()}) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Could not send reset code.");
+    box.textContent = data.message || "If an account exists, a code has been sent.";
+    box.style.display = "block";
+  } catch (err) { box.textContent = err.message; box.style.display = "block"; }
+}
+async function confirmPasswordReset(e) {
+  e.preventDefault();
+  const box = document.getElementById("forgotError");
+  box.style.display = "none";
+  try {
+    const res = await fetch("/api/auth/password/reset", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({email: document.getElementById("resetEmail").value.trim(), code: document.getElementById("resetCode").value.trim(), new_password: document.getElementById("resetNewPassword").value}) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(Array.isArray(data.detail) ? data.detail.join("\n") : (data.detail || "Password reset failed."));
+    box.textContent = data.message; box.style.display = "block";
+    document.getElementById("resetCode").value = "";
+    document.getElementById("resetNewPassword").value = "";
+    setTimeout(() => switchModal("forgot", "login"), 1400);
+  } catch (err) { box.textContent = err.message; box.style.display = "block"; }
 }
 
 /* ── Login submit ── */
@@ -1294,7 +1381,7 @@ async function handleLogin(e) {
 /* ── Tab Switcher ── */
 function switchTab(tab) {
   activeTab = tab;
-  ["markets", "watchlist", "portfolio", "alerts"].forEach(t => {
+  ["markets", "watchlist", "portfolio", "alerts", "wallet"].forEach(t => {
     document.getElementById("view-" + t).style.display = (t === tab ? "block" : "none");
     document.getElementById("tabBtn-" + t).classList.toggle("active", t === tab);
   });
@@ -1323,6 +1410,11 @@ function switchTab(tab) {
     statVal.textContent = document.getElementById("alertsCountBadge").textContent;
     statSub.textContent = "Active target triggers";
     if (currentUser) loadAlerts();
+  } else if (tab === "wallet") {
+    statLabel.textContent = "💳 Wallet Accounts";
+    statVal.textContent = "NGN + USD";
+    statSub.textContent = "Balances and transaction ledger";
+    if (currentUser) loadWallet();
   }
 }
 
@@ -1378,13 +1470,47 @@ function updateTopStats(list) {
   document.getElementById("statLoserSub").textContent = "▼ " + Math.abs(loser.change_24h).toFixed(2) + "%";
 }
 
-function filterTable() {
-  const q = document.getElementById("marketSearch").value.toLowerCase();
-  document.querySelectorAll("#rows tr").forEach(tr => {
-    const id = tr.id.replace("row-", "");
-    tr.style.display = id.includes(q) ? "" : "none";
-  });
+let marketPage = 1;
+let marketSearchTimer = null;
+function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function currencyFormat(value) {
+  const code = VS.toUpperCase();
+  try { return new Intl.NumberFormat(undefined, {style:"currency", currency:code, maximumFractionDigits:value < 1 ? 8 : 2}).format(value); }
+  catch (_) { return `${code} ${fmt(value)}`; }
 }
+async function loadMarkets() {
+  const q = document.getElementById("marketSearch").value.trim();
+  const rows = document.getElementById("rows");
+  rows.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px">Loading live coin markets…</td></tr>';
+  try {
+    const params = new URLSearchParams({page:String(marketPage), per_page:"100", vs:VS});
+    if (q) params.set("q", q);
+    const response = await fetch(`/api/coins?${params}`);
+    if (!response.ok) throw new Error("Market data is temporarily unavailable.");
+    const coins = await response.json();
+    rows.innerHTML = "";
+    coins.forEach(coin => {
+      currentPrices[coin.coin_id] = {coin_id:coin.coin_id, price:coin.price, change_24h:coin.change_24h, market_cap:coin.market_cap, vs_currency:VS};
+      const tr = document.createElement("tr"); tr.id = `row-${coin.coin_id}`;
+      const change = coin.change_24h; const changeClass = change == null ? "" : change >= 0 ? "up" : "down";
+      tr.innerHTML = `<td><button class="star-btn" id="star-${escapeHtml(coin.coin_id)}" onclick="toggleWatchlist('${escapeHtml(coin.coin_id)}')" title="Star to watchlist">★</button></td>
+        <td><div class="coin-cell">${coin.image ? `<img src="${escapeHtml(coin.image)}" alt="" width="30" height="30" style="border-radius:50%">` : `<div class="coin-avatar">${escapeHtml(String(coin.symbol || coin.coin_id).slice(0,2))}</div>`}<div><div class="coin-name">${escapeHtml(coin.name || coin.coin_id)}</div><div class="coin-tag">${escapeHtml(coin.symbol || "") .toUpperCase()}</div></div></div></td>
+        <td><span class="price-val" id="price-${escapeHtml(coin.coin_id)}">${currencyFormat(coin.price)}</span></td>
+        <td><span class="badge ${changeClass}" id="chg-${escapeHtml(coin.coin_id)}">${change == null ? "—" : pct(change)}</span></td>
+        <td class="mcap" id="mcap-${escapeHtml(coin.coin_id)}">${compact(coin.market_cap)}</td>
+        <td><button class="action-btn" onclick="showChart('${escapeHtml(coin.coin_id)}')">📈 Chart</button> <button class="action-btn" onclick="quickAlert('${escapeHtml(coin.coin_id)}')">🔔 Alert</button></td>`;
+      rows.appendChild(tr);
+    });
+    document.getElementById("statCoins").textContent = coins.length;
+    document.getElementById("marketPageLabel").textContent = q ? `${coins.length} search results` : `Page ${marketPage}`;
+    document.getElementById("marketPrev").disabled = marketPage <= 1 || !!q;
+    document.getElementById("marketNext").disabled = coins.length < 100 || !!q;
+    updateStarButtons();
+  } catch (error) { rows.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--down)">${escapeHtml(error.message)}</td></tr>`; }
+}
+function searchMarkets() { clearTimeout(marketSearchTimer); marketPage = 1; marketSearchTimer = setTimeout(loadMarkets, 350); }
+function changeMarketPage(direction) { marketPage = Math.max(1, marketPage + direction); loadMarkets(); }
+function changeMarketCurrency() { VS = document.getElementById("marketCurrency").value; document.getElementById("marketPriceHeading").textContent = `Price (${VS.toUpperCase()})`; marketPage = 1; loadMarkets(); }
 
 /* ── Watchlist feature ── */
 async function loadWatchlist() {
@@ -1484,6 +1610,32 @@ function renderWatchlistView() {
       </td>`;
     tbody.appendChild(tr);
   });
+}
+
+async function loadWallet() {
+  if (!token) return;
+  const headers = { "Authorization": `Bearer ${token}` };
+  try {
+    const [walletRes, txRes] = await Promise.all([fetch("/api/wallets", {headers}), fetch("/api/wallets/transactions", {headers})]);
+    if (!walletRes.ok || !txRes.ok) throw new Error("Could not load wallet");
+    const wallets = await walletRes.json();
+    wallets.forEach(w => { const el = document.getElementById(w.currency === "NGN" ? "walletNgn" : "walletUsd"); el.textContent = (w.currency === "NGN" ? "₦" : "$") + fmt(w.balance, 2); });
+    const txs = await txRes.json();
+    document.getElementById("walletTransactions").innerHTML = txs.length ? txs.map(t => `<tr><td>${new Date(t.created_at).toLocaleString()}</td><td>${escapeHtml(t.type)}</td><td>${escapeHtml(t.currency)} ${fmt(t.amount, 2)}</td><td>${escapeHtml(t.status)}</td><td>${escapeHtml(t.reference)}</td></tr>`).join("") : '<tr><td colspan="5">No wallet transactions yet.</td></tr>';
+  } catch (e) { showToast("Wallet unavailable", e.message); }
+}
+
+async function walletDeposit(e) {
+  e.preventDefault();
+  try { const res = await fetch("/api/wallets/deposit", {method:"POST", headers:{"Content-Type":"application/json", "Authorization":`Bearer ${token}`}, body:JSON.stringify({amount:document.getElementById("depositAmount").value, currency:"NGN"})}); const data = await res.json(); if (!res.ok) throw new Error(data.detail || "Deposit could not be started"); window.location.href = data.authorization_url; } catch(err) { showToast("Deposit not started", err.message); }
+}
+async function walletTransfer(e) {
+  e.preventDefault();
+  try { const res = await fetch("/api/wallets/transfer", {method:"POST", headers:{"Content-Type":"application/json", "Authorization":`Bearer ${token}`}, body:JSON.stringify({recipient_username:document.getElementById("transferUsername").value.trim(), currency:document.getElementById("transferCurrency").value, amount:document.getElementById("transferAmount").value})}); const data = await res.json(); if (!res.ok) throw new Error(data.detail || "Transfer failed"); showToast("Transfer complete", `${data.amount} ${data.currency} sent.`); e.target.reset(); await loadWallet(); } catch(err) { showToast("Transfer failed", err.message); }
+}
+async function walletWithdraw(e) {
+  e.preventDefault();
+  try { const payload = {amount:document.getElementById("withdrawAmount").value, currency:"NGN", account_number:document.getElementById("withdrawAccount").value, bank_code:document.getElementById("withdrawBankCode").value.trim(), account_name:document.getElementById("withdrawAccountName").value.trim()}; const res = await fetch("/api/wallets/withdraw", {method:"POST", headers:{"Content-Type":"application/json", "Authorization":`Bearer ${token}`}, body:JSON.stringify(payload)}); const data = await res.json(); if (!res.ok) throw new Error(data.detail || "Withdrawal failed"); showToast("Withdrawal submitted", data.message); e.target.reset(); await loadWallet(); } catch(err) { showToast("Withdrawal not submitted", err.message); }
 }
 
 /* ── Portfolio feature ── */
@@ -1772,7 +1924,8 @@ function connect() {
 
 /* ── Boot Initializer ── */
 checkAuth();
-fetch("/api/prices")
+loadMarkets();
+fetch("/api/prices?vs=" + encodeURIComponent(VS))
   .then(r => (r.ok ? r.json() : []))
   .then(renderPrices)
   .catch(() => {});

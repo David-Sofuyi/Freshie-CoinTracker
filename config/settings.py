@@ -106,3 +106,13 @@ DEFAULT_COINS = [c.strip().lower() for c in os.getenv("DEFAULT_COINS", "bitcoin,
 DEFAULT_VS_CURRENCY = os.getenv("DEFAULT_VS_CURRENCY", "usd").lower()
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "30"))
 PRICE_CACHE_TTL = int(os.getenv("PRICE_CACHE_TTL", "15"))
+
+# Email: console backend is safe for local development; configure SMTP in production.
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "1") == "1"
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "CryptoTracker <no-reply@example.com>")
+PASSWORD_RESET_CODE_MINUTES = int(os.getenv("PASSWORD_RESET_CODE_MINUTES", "10"))

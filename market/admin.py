@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import ApiToken, Holding, PriceAlert, PriceSnapshot, WatchlistItem
+from .models import ApiToken, Holding, PriceAlert, PriceSnapshot, WatchlistItem, PaystackDedicatedAccount
 
 
 @admin.register(ApiToken)
@@ -32,3 +32,10 @@ class PriceAlertAdmin(admin.ModelAdmin):
 class HoldingAdmin(admin.ModelAdmin):
     list_display = ("user", "coin_id", "amount", "avg_buy_price", "updated_at")
     list_filter = ("coin_id",)
+
+
+@admin.register(PaystackDedicatedAccount)
+class PaystackDedicatedAccountAdmin(admin.ModelAdmin):
+    list_display = ("user", "bank_name", "account_number", "currency", "status", "created_at")
+    search_fields = ("user__username", "user__email", "account_number", "customer_code")
+    readonly_fields = ("customer_code", "account_name", "account_number", "bank_name", "bank_slug", "currency", "status", "consented_at", "provider_metadata", "created_at", "updated_at")
